@@ -3,7 +3,7 @@
 #include <PubSubClient.h>
 
 // Configurações do MQTT
-const char* mqttServer = "a3bw5rp1377npv-ats.iot.us-east-1.amazonaws.com";
+const char* mqttServer = "ahbccp4thrap8-ats.iot.us-east-1.amazonaws.com";
 const int mqttPort = 8883;
 const char* mqttUser = "";
 const char* mqttPassword = "";
@@ -34,54 +34,54 @@ rqXRfboQnoZsG4q5WTP468SQvvG5
 
 const char* certificate = R"EOF(
 -----BEGIN CERTIFICATE-----
-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
+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
 -----END CERTIFICATE-----
 )EOF";
 
 const char* privateKey = R"EOF(
 -----BEGIN RSA PRIVATE KEY-----
-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
+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
 -----END RSA PRIVATE KEY-----
 )EOF";
 
@@ -90,27 +90,17 @@ PubSubClient client(espClient);
 
 const int analogPin = 36;
 const int totalReadings = 10;
+const unsigned long readingInterval = 2 * 60 * 60 * 1000; // 2 horas em milissegundos
 
 void setup() {
-  Serial.begin(9600);  // Aumentada a velocidade da serial
+  Serial.begin(9600);
   while (!Serial) {
     ; // Espera a serial estar pronta
   }
   delay(1000);
   Serial.println("\n--- Iniciando setup... ---");
 
-  // Escaneia redes WiFi disponíveis
-  scanNetworks();
-
-  // Solicita o nome e senha da rede WiFi
-  String ssid = promptForInput("Digite o nome da rede WiFi: ");
-  String password = promptForInput("Digite a senha da rede WiFi: ");
-
-  Serial.println("SSID fornecido: " + ssid);
-  Serial.println("Senha fornecida: " + password);
-
-  // Conecta à rede Wi-Fi com as credenciais fornecidas
-  connectToWiFi(ssid.c_str(), password.c_str());
+  setupWiFi();
 
   // Configura o cliente MQTT
   Serial.println("Configurando cliente MQTT...");
@@ -121,40 +111,74 @@ void setup() {
   Serial.println("Cliente MQTT configurado.");
 
   // Tenta conectar ao MQTT
-  reconnect();
+  reconnectMQTT();
 
   Serial.println("--- Setup concluído ---");
 }
 
 void loop() {
-  Serial.println("\n--- Iniciando loop ---");
+  Serial.println("\n--- Iniciando ciclo de leituras ---");
   
-  if (!client.connected()) {
-    Serial.println("Cliente MQTT desconectado. Tentando reconectar...");
-    reconnect();
+  while (true) {
+    if (!client.connected()) {
+      Serial.println("Cliente MQTT desconectado. Tentando reconectar...");
+      reconnectMQTT();
+    }
+    client.loop();
+
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Conexão WiFi perdida. Tentando reconectar...");
+      setupWiFi();
+    }
+
+    float average = readAverageMoisture();
+    String moistureLevel = classifyMoistureLevel(average);
+
+    // Publica os dados no MQTT
+    String payload = "{\"moisture\":" + String(average) + ", \"status\":\"" + moistureLevel + "\"}";
+    Serial.println("Tentando publicar no tópico 'moisture_sensor'...");
+    if (client.publish("moisture_sensor", payload.c_str())) {
+      Serial.println("Publicação bem-sucedida!");
+      Serial.println(payload.c_str());
+    } else {
+      Serial.println("Falha na publicação. Estado do cliente: " + String(client.state()));
+    }
+
+    Serial.println("Deseja fazer outra leitura? (S/N)");
+    String response = promptForInput("");
+    
+    if (response.equalsIgnoreCase("N")) {
+      Serial.println("Aguardando 2 horas antes da próxima verificação...");
+      delay(readingInterval);
+    } else if (!response.equalsIgnoreCase("S")) {
+      Serial.println("Resposta inválida. Assumindo 'Não'.");
+      Serial.println("Aguardando 2 horas antes da próxima verificação...");
+      delay(readingInterval);
+    }
   }
-  client.loop();
+}
 
-  float average = readAverageMoisture();
-  String moistureLevel = classifyMoistureLevel(average);
+void setupWiFi() {
+  while (true) {
+    scanNetworks();
 
-  Serial.print("Média de umidade após 10 leituras: ");
-  Serial.print(average);
-  Serial.println("%");
-  Serial.println("Classificação: " + moistureLevel);
+    String ssid = promptForInput("Digite o nome da rede WiFi: ");
+    String password = promptForInput("Digite a senha da rede WiFi: ");
 
-  // Publica os dados no MQTT
-  String payload = "{\"moisture\":" + String(average) + ", \"status\":\"" + moistureLevel + "\"}";
-  Serial.println("Tentando publicar no tópico 'moisture_sensor'...");
-  if (client.publish("moisture_sensor", payload.c_str())) {
-    Serial.println("Publicação bem-sucedida!");
-    Serial.println(payload.c_str());
-  } else {
-    Serial.println("Falha na publicação. Estado do cliente: " + String(client.state()));
+    Serial.println("SSID fornecido: " + ssid);
+    Serial.println("Senha fornecida: " + password);
+
+    if (connectToWiFi(ssid.c_str(), password.c_str())) {
+      break;
+    } else {
+      Serial.println("Falha na conexão. Deseja tentar novamente? (S/N)");
+      String response = promptForInput("");
+      if (response.equals("s")) {
+        Serial.println("Encerrando tentativas de conexão WiFi.");
+        break;
+      }
+    }
   }
-
-  Serial.println("Aguardando 5 segundos antes do próximo ciclo...");
-  delay(5000);
 }
 
 void scanNetworks() {
@@ -219,7 +243,7 @@ bool connectToWiFi(const char* ssid, const char* password) {
   }
 }
 
-void reconnect() {
+void reconnectMQTT() {
   int attempts = 0;
   while (!client.connected() && attempts < 5) {
     Serial.print("Tentativa ");
@@ -227,6 +251,7 @@ void reconnect() {
     Serial.println(" de conexão ao MQTT...");
     if (client.connect("ESP32Client")) {
       Serial.println("Conectado ao MQTT com sucesso!");
+      return;
     } else {
       Serial.print("Falha na conexão, rc=");
       Serial.print(client.state());
@@ -237,6 +262,13 @@ void reconnect() {
   }
   if (!client.connected()) {
     Serial.println("Falha em todas as tentativas de conexão MQTT.");
+    Serial.println("Deseja tentar novamente? (S/N)");
+    String response = promptForInput("");
+    if (response.equals("s")) {
+      reconnectMQTT();
+    } else {
+      Serial.println("Encerrando tentativas de conexão MQTT.");
+    }
   }
 }
 
