@@ -4,113 +4,23 @@
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <ArduinoJson.h>
-// #include "certificates.h"
+#include "certificates.h"
 
 // Definindo os pinos dos sensores
 #define DHTPIN 18               // Pino do sensor DHT para umidade e temperatura do ar
 #define DHTTYPE DHT22           // Tipo de sensor DHT
 #define SOIL_MOISTURE_PIN 36    // Pino do sensor de umidade do solo
 #define LUMINOSITY_PIN 39       // Pino do sensor de luminosidade
-#define DS18B20_PIN 25           // Pino do sensor de temperatura DS18B20 S2 (ajuste conforme necessário)
+#define DS18B20_PIN 4           // Pino do sensor de temperatura DS18B20 (ajuste conforme necessário)
 
 DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(DS18B20_PIN);           
 DallasTemperature soilTempSensor(&oneWire); 
 
-// Definindo as credenciais do AWS IoT
-const char* mqttEndpoint = "aejwurestbom1-ats.iot.us-east-1.amazonaws.com";
-
-const char* rootCA = R"EOF(
------BEGIN CERTIFICATE-----
-MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
-ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6
-b24gUm9vdCBDQSAxMB4XDTE1MDUyNjAwMDAwMFoXDTM4MDExNzAwMDAwMFowOTEL
-MAkGA1UEBhMCVVMxDzANBgNVBAoTBkFtYXpvbjEZMBcGA1UEAxMQQW1hem9uIFJv
-b3QgQ0EgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALJ4gHHKeNXj
-ca9HgFB0fW7Y14h29Jlo91ghYPl0hAEvrAIthtOgQ3pOsqTQNroBvo3bSMgHFzZM
-9O6II8c+6zf1tRn4SWiw3te5djgdYZ6k/oI2peVKVuRF4fn9tBb6dNqcmzU5L/qw
-IFAGbHrQgLKm+a/sRxmPUDgH3KKHOVj4utWp+UhnMJbulHheb4mjUcAwhmahRWa6
-VOujw5H5SNz/0egwLX0tdHA114gk957EWW67c4cX8jJGKLhD+rcdqsq08p8kDi1L
-93FcXmn/6pUCyziKrlA4b9v7LWIbxcceVOF34GfID5yHI9Y/QCB/IIDEgEw+OyQm
-jgSubJrIqg0CAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMC
-AYYwHQYDVR0OBBYEFIQYzIU07LwMlJQuCFmcx7IQTgoIMA0GCSqGSIb3DQEBCwUA
-A4IBAQCY8jdaQZChGsV2USggNiMOruYou6r4lK5IpDB/G/wkjUu0yKGX9rbxenDI
-U5PMCCjjmCXPI6T53iHTfIUJrU6adTrCC2qJeHZERxhlbI1Bjjt/msv0tadQ1wUs
-N+gDS63pYaACbvXy8MWy7Vu33PqUXHeeE6V/Uq2V8viTO96LXFvKWlJbYK8U90vv
-o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU
-5MsI+yMRQ+hDKXJioaldXgjUkK642M4UwtBV8ob2xJNDd2ZhwLnoQdeXeGADbkpy
-rqXRfboQnoZsG4q5WTP468SQvvG5
------END CERTIFICATE-----
-)EOF";
-
-const char* certificate = R"EOF(
------BEGIN CERTIFICATE-----
-MIIDWTCCAkGgAwIBAgIUR33cZJ5BIJQOywfUZRhduRDZHvcwDQYJKoZIhvcNAQEL
-BQAwTTFLMEkGA1UECwxCQW1hem9uIFdlYiBTZXJ2aWNlcyBPPUFtYXpvbi5jb20g
-SW5jLiBMPVNlYXR0bGUgU1Q9V2FzaGluZ3RvbiBDPVVTMB4XDTI0MTAxODE2MjMz
-M1oXDTQ5MTIzMTIzNTk1OVowHjEcMBoGA1UEAwwTQVdTIElvVCBDZXJ0aWZpY2F0
-ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAM/c0Dj8dapsda/Jm1eI
-2ZF8OjYLFgkfSvXEIv5sNkSpu+rE7hQF2BTbnqzodVcR6ndq9o/CSppTH+u/iwzv
-hs0ViWcacUZpfcOdtsEFwCKy28ImZT4n6JePxbXUWZZtVEDEG1v5ai3LBiTlPPGB
-rCds4t2TJ2pXKqWu2KVRO4ALLmiIHIPpa9rCr0xDoq3+g7PT1AecNYfLV7EsXrO7
-5F743gphzjyDDyr9+Zl5hClcIXALJixUt9AQdBENY/wvdHpN5Z+19HAHjd2Ckuq0
-Fh7tT+ED3cJVRAcjbSTTZlpxJ6JxALH7JKeTN/tsYalCyWGjzm4CmLgwxxMce8I9
-idsCAwEAAaNgMF4wHwYDVR0jBBgwFoAUym2rFHDRmUM9Sr/uSvgSaBcACS8wHQYD
-VR0OBBYEFO+nCZ3SueQXmiEUGmMtkplRt0fNMAwGA1UdEwEB/wQCMAAwDgYDVR0P
-AQH/BAQDAgeAMA0GCSqGSIb3DQEBCwUAA4IBAQC9aG5jI2K2XiSKvi4tA2X42fsY
-yEj2/LJVZ/GI4zHgipjqyn4280Zw8FLlodJ3A9BIfFammFbjcdt/qKG9mmTlY5s0
-O9eInTQzZfyIrvnuHa5zQ3sfEF19nolx4Yo6JJr9+4iT3ZB3wg6IlpYkrt8DDAoG
-FDtdNE5ZdoTB6llfjXtLZei+xGQ2ZLvJj4QSm6QqSeG1Tsdip3osyusKQ9EsuN0s
-V2KdMELwJTO/aQenIzAuDnGW1hOt2dN10tIuL1R5bnCyrX8DwZiVR2+SQVrR6Aky
-0/lXhrSOQaLg5XJCgmpdbEznxBhxu95ZjGBH9pgMCaSdSE6uJaL95Ggl7tBK
------END CERTIFICATE-----
-)EOF";
-
-const char* privateKey = R"EOF(
------BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAz9zQOPx1qmx1r8mbV4jZkXw6NgsWCR9K9cQi/mw2RKm76sTu
-FAXYFNuerOh1VxHqd2r2j8JKmlMf67+LDO+GzRWJZxpxRml9w522wQXAIrLbwiZl
-Pifol4/FtdRZlm1UQMQbW/lqLcsGJOU88YGsJ2zi3ZMnalcqpa7YpVE7gAsuaIgc
-g+lr2sKvTEOirf6Ds9PUB5w1h8tXsSxes7vkXvjeCmHOPIMPKv35mXmEKVwhcAsm
-LFS30BB0EQ1j/C90ek3ln7X0cAeN3YKS6rQWHu1P4QPdwlVEByNtJNNmWnEnonEA
-sfskp5M3+2xhqULJYaPObgKYuDDHExx7wj2J2wIDAQABAoIBAFYqQ8qLpL8rzLE9
-En77xKzRYVQLzmujpDAyyQrMksZt0e8lCUgVkBg9Xg5xIksgqyArn9/B+6jzclUI
-hryrAic7mUS7Kl+01SRk2WA0YQxBNmXKAsf8RSemup+AUk7QLU/XuzuqLYCkG3zp
-5hR624FQWs7c9EbZsV0TGM2W2eJegHX7jVI3DD4ghHPsRwILHg3Ucz83GizBJW/L
-I4B52uR/QxNE1I4aX0DQNBBSU0yUg+1HDFWPQL66YrOOPWB5UzjmTPI3pFf1isAC
-CSL3Bf8dsfe+nKTM3nB2WdC1pU3Rkf7GUaKoY6BEZF9QVXedOxbjI7k5yc9+UWWn
-9AyTMmkCgYEA9830nzClylS24ZP4jTAoz/6IjpKv8g5nUM1zpf7/TwvXnXtZsp3j
-l/ZThRR2jdTA40F6rYz/pWSlsovXYWeQ8/F1Hiy32xsD9jHd3IQHXJf3B+bHSRU6
-sTw4FO3jD2e5P2VSUW3BWpFz5T9CXBCB/8dDel+NdJ+ovAgFW91ZGq8CgYEA1ryw
-H7BrHoe09DWiP8oMZK+M8NvBRXHqRJpFkTeON7rvMz+Hb4/lKACDePjIA6fhhpd5
-GIwTP4AXHJFeEZgqQqjj4Y5VSVjXRyTiYGVCfOp26DIq0uTH2EuHclg1Md91Y/2H
-d3s89lweITzcCZyI3RbOtLdYP8dNYBaCCJXnnpUCgYB8iRzvA9vOG1TteRfonNNl
-9F1ciYuy8lop2ZbNTaGxcBokIuGpSoAe1sSSlP4fuVRW4YltvvabgEFlwbG0WgAX
-GLnrOD4N9z2+dMEzGYc5mYWkiu6MZAbjG4hzvDnofBA1NA5yrd4GTiMYivommoU6
-rkHTNkI44iRCmyVWTZ+CMQKBgGDmyPuj2tLuHmRNh6gNf0Y4SfuuzyqNW1AV5erA
-DTds7eBMfMuFPb2tbaa7bVbo/UaFOCoxm8X+AW/s0WxTJE7sc9knJ6lvo8YBCP7C
-8xv3mizx5o1AnEYo3zhkQaz9z7WNhQIP5NSvgREyq4DS2JgcYK8ARZySTYJc5dUG
-AH15AoGBAPPrc1fT6Zv8c5HRaFbRcMdYd9Z2+C/IXA6JCBQiQea8ymbE+rBxwms7
-1Aj20r3iwNdam7vmZeekS71IZpOhHKVkET8BGwjgpO3huJGI3fVSd1pvZI75nUGv
-n/Q4zYgvgiTlWl7yDTGou5frubt7IIGOGDpgd4tP/9NpeHUfUMrx
------END RSA PRIVATE KEY-----
-)EOF";
-
 // Variáveis de WiFi e MQTT
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 String ssid, password;
-
-// BLE Configuration
-#define SERVICE_UUID "4fafc201-1fb5-459e-8d40-b6b0e6e9b6b2"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
-BLEServer *pServer;
-BLECharacteristic *pCharacteristic;
 
 // Declaração de funções
 void listWiFiNetworks();
@@ -118,28 +28,6 @@ void connectWiFi();
 void reconnectMQTT();
 void sendToMQTT(String topic, String payload);
 float calibrateSoilMoisture(int rawValue);
-void bleSetup();
-
-// Declaração da classe MyServerCallbacks
-class MyServerCallbacks : public BLEServerCallbacks {
-  void onWrite(BLECharacteristic *pCharacteristic) {
-    String json = pCharacteristic->getValue().c_str();
-    Serial.println("Recebido JSON: " + json);
-
-    // Parse JSON para obter credenciais
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, json);
-    if (!error) {
-      ssid = doc["ssid"].as<String>();
-      password = doc["password"].as<String>();
-      Serial.println("Credenciais WiFi recebidas:");
-      Serial.println("SSID: " + ssid);
-      Serial.println("Senha: " + password);
-    } else {
-      Serial.println("Falha ao analisar JSON");
-    }
-  }
-};
 
 void setup() {
   Serial.begin(115200);
@@ -148,20 +36,13 @@ void setup() {
   dht.begin();  
   soilTempSensor.begin();
 
-  bleSetup(); // Inicia o BLE
-  Serial.println("BLE configurado, aguardando credenciais do WiFi...");
-
-  while (ssid.isEmpty() || password.isEmpty()) {
-    delay(1000); // Aguarda receber as credenciais
-  }
-
   listWiFiNetworks();
   connectWiFi();
 
   espClient.setCACert(rootCA);
   espClient.setCertificate(certificate);
   espClient.setPrivateKey(privateKey);
-  client.setServer(mqttEndpoint, 8883); 
+  client.setServer(mqttEndpoint, mqttPort); 
 }
 
 void loop() {
@@ -251,69 +132,63 @@ void loop() {
   }
 }
 
-void bleSetup() {
-  BLEDevice::init("TerraFarming");
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-  
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-  pCharacteristic = pService->createCharacteristic(
-    CHARACTERISTIC_UUID,
-    BLECharacteristic::PROPERTY_WRITE
-  );
-
-  pService->start();
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->start();
-}
-
 void listWiFiNetworks() {
-  Serial.println("Procurando redes WiFi...");
-  int n = WiFi.scanNetworks();
-  Serial.println("Redes WiFi encontradas: " + String(n));
-  for (int i = 0; i < n; ++i) {
-    Serial.print(i + 1);
+  Serial.println("Procurando redes WiFi disponíveis...");
+  int numNetworks = WiFi.scanNetworks();
+
+  if (numNetworks == 0) {
+    Serial.println("Nenhuma rede encontrada.");
+    return;
+  }
+
+  Serial.println("Redes WiFi disponíveis:");
+  for (int i = 0; i < numNetworks; ++i) {
+    Serial.print(i);
     Serial.print(": ");
     Serial.print(WiFi.SSID(i));
-    Serial.print(" (RSSI: ");
+    Serial.print(" (");
     Serial.print(WiFi.RSSI(i));
     Serial.println(" dBm)");
     delay(10);
   }
+
+  Serial.println("Digite o nome (SSID) da rede que você deseja conectar:");
+  while (Serial.available() == 0) {}
+  ssid = Serial.readString();
+  ssid.trim();
+
+  Serial.println("Digite a senha da rede WiFi:");
+  while (Serial.available() == 0) {}
+  password = Serial.readString();
+  password.trim();
 }
 
 void connectWiFi() {
-  Serial.print("Conectando ao WiFi ");
-  Serial.println(ssid);
+  Serial.println("Conectando à rede WiFi...");
   WiFi.begin(ssid.c_str(), password.c_str());
-
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.print(".");
   }
-  Serial.println("");
-  Serial.println("Conectado ao WiFi com sucesso!");
+  Serial.println("\nWiFi conectado com sucesso!");
 }
 
 void reconnectMQTT() {
   while (!client.connected()) {
-    Serial.print("Tentando conexão MQTT...");
+    Serial.print("Tentando conectar ao MQTT...");
     if (client.connect("ESP32Client")) {
-      Serial.println("conectado");
+      Serial.println("Conectado ao MQTT.");
     } else {
-      Serial.print("falha com erro: ");
+      Serial.print("Falha na conexão, rc=");
       Serial.print(client.state());
-      delay(2000);
+      Serial.println(" Tentando novamente em 5 segundos.");
+      delay(5000);
     }
   }
 }
 
 void sendToMQTT(String topic, String payload) {
-  if (client.publish(topic.c_str(), payload.c_str())) {
-    Serial.println("Mensagem enviada: " + payload);
-  } else {
-    Serial.println("Falha ao enviar mensagem");
-  }
+  client.publish(topic.c_str(), payload.c_str());
 }
 
 float calibrateSoilMoisture(int rawValue) {

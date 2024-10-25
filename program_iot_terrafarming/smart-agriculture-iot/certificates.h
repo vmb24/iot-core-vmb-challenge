@@ -1,5 +1,10 @@
 // certificates.h
 
+// Definindo as credenciais do AWS IoT
+const int mqttPort = 8883; // Porta para conexão segura
+
+const char* mqttEndpoint = "aejwurestbom1-ats.iot.us-east-1.amazonaws.com";
+
 const char* rootCA = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
