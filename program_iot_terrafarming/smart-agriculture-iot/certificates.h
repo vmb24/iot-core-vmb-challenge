@@ -1,7 +1,5 @@
 // certificates.h
 
-"aejwurestbom1-ats.iot.us-east-1.amazonaws.com";
-
 const char* rootCA = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
