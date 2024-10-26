@@ -4,11 +4,6 @@
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
-#include <ArduinoJson.h>
 #include "certificates.h"
 
 // Definindo os pinos dos sensores
@@ -16,7 +11,7 @@
 #define DHTTYPE DHT22           // Tipo de sensor DHT
 #define SOIL_MOISTURE_PIN 36    // Pino do sensor de umidade do solo
 #define LUMINOSITY_PIN 39       // Pino do sensor de luminosidade
-#define DS18B20_PIN 4           // Pino do sensor de temperatura DS18B20 (ajuste conforme necessário)
+#define DS18B20_PIN 4           // Pino do sensor de temperatura DS18B20
 
 DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(DS18B20_PIN);           
@@ -25,78 +20,17 @@ DallasTemperature soilTempSensor(&oneWire);
 // Variáveis de WiFi e MQTT
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
-
-// Variáveis BLE
-BLEServer *pServer = nullptr;
-BLEAdvertising *pAdvertising = nullptr;
+String ssid, password;
+String crops[3];  // Array para armazenar culturas
+String uuid;
 
 // Declaração de funções
-void setupBLE();
 void listWiFiNetworks();
 void connectWiFi();
 void reconnectMQTT();
 void sendToMQTT(String topic, String payload);
 float calibrateSoilMoisture(int rawValue);
-
-// Definindo UUIDs do serviço e característica BLE
-#define SERVICE_UUID "4fafc201-1fb5-459e-8d40-b6b0e6e9b6b2"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
-String ssid, password;
-String crops[2];
-String uuid;
-
-// Funções BLE
-class MyServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-        Serial.println("Cliente BLE conectado");
-    }
-
-    void onDisconnect(BLEServer* pServer) {
-        Serial.println("Cliente BLE desconectado");
-        pAdvertising->start(); // Reinicia a publicidade ao desconectar
-        Serial.println("Publicidade BLE reiniciada.");
-    }
-};
-
-class MyCallbacks : public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic* pCharacteristic) {
-        String value = pCharacteristic->getValue();
-        StaticJsonDocument<200> doc;
-        DeserializationError error = deserializeJson(doc, value);
-
-        if (error) {
-            Serial.print("Falha ao parsear JSON: ");
-            Serial.println(error.f_str());
-            return;
-        }
-
-        // Verifica se a chave "crops" existe e tem pelo menos dois elementos
-        if (doc.containsKey("crops") && doc["crops"].is<JsonArray>() && doc["crops"].size() >= 2) {
-            crops[0] = doc["crops"][0].as<String>();
-            crops[1] = doc["crops"][1].as<String>();
-            Serial.println("Culturas recebidas: " + crops[0] + ", " + crops[1]);
-        } else {
-            Serial.println("Erro: Dados de 'crops' incompletos ou ausentes");
-            crops[0] = "";  // Define valores padrão caso os dados estejam incompletos
-            crops[1] = "";
-        }
-
-        // Verifica se a chave "uuid" existe
-        if (doc.containsKey("uuid")) {
-            uuid = doc["uuid"].as<String>();
-        } else {
-            Serial.println("Erro: UUID ausente");
-            uuid = "";  // Define valor padrão caso o UUID esteja ausente
-        }
-
-        // Exibe os valores recebidos para verificação
-        Serial.println("Dados recebidos via BLE:");
-        Serial.print("Cultura 1: "); Serial.println(crops[0].isEmpty() ? "Não recebida" : crops[0]);
-        Serial.print("Cultura 2: "); Serial.println(crops[1].isEmpty() ? "Não recebida" : crops[1]);
-        Serial.print("UUID: "); Serial.println(uuid.isEmpty() ? "Não recebido" : uuid);
-    }
-};
+String analyzeStatus(float value, String type);
 
 void setup() {
   Serial.begin(115200);
@@ -104,6 +38,7 @@ void setup() {
 
   dht.begin();  
   soilTempSensor.begin();
+
   listWiFiNetworks();
   connectWiFi();
 
@@ -111,104 +46,121 @@ void setup() {
   espClient.setCertificate(certificate);
   espClient.setPrivateKey(privateKey);
   client.setServer(mqttEndpoint, mqttPort); 
+  
+  // Solicitar culturas e UUID no início
+  for (int i = 0; i < 3; i++) {
+    Serial.print("Digite a cultura ");
+    Serial.print(i + 1);
+    Serial.println(" (ex: Milho):");
+    while (Serial.available() == 0) {}
+    crops[i] = Serial.readString();
+    crops[i].trim();
+  }
 
-  setupBLE();
+  Serial.println("Digite o UUID da aplicação:");
+  while (Serial.available() == 0) {}
+  uuid = Serial.readString();
+  uuid.trim();
+
+  // Verificar conexão MQTT
+  if (!client.connected()) {
+    reconnectMQTT();
+  }
 }
 
 void loop() {
+  Serial.println("Iniciando coletas de dados...");
+
+  float soilMoistureAvg = 0, soilTempAvg = 0, airMoistureAvg = 0, airTempAvg = 0, brightnessAvg = 0;
+
+  for (int i = 0; i < 10; i++) {
+    float soilMoisture = calibrateSoilMoisture(analogRead(SOIL_MOISTURE_PIN));
+    float airHumidity = dht.readHumidity();
+    float airTemp = dht.readTemperature(); 
+    float luminosity = map(analogRead(LUMINOSITY_PIN), 0, 4095, 0, 100000); 
+    
+    soilTempSensor.requestTemperatures();
+    float soilTemp = soilTempSensor.getTempCByIndex(0);
+
+    // Substituir por zero se não houver leitura válida
+    soilMoisture = isnan(soilMoisture) ? 0 : soilMoisture;
+    soilTemp = (soilTemp == DEVICE_DISCONNECTED_C || isnan(soilTemp)) ? 0 : soilTemp;
+    airHumidity = isnan(airHumidity) ? 0 : airHumidity;
+    airTemp = isnan(airTemp) ? 0 : airTemp;
+    luminosity = isnan(luminosity) ? 0 : luminosity;
+
+    // Impressão das leituras
+    Serial.print("Leitura ");
+    Serial.print(i + 1);
+    Serial.print(": ");
+    Serial.print("Umidade do Solo: " + String(soilMoisture) + "% | ");
+    Serial.print("Temperatura do Solo: " + String(soilTemp) + "°C | ");
+    Serial.print("Luminosidade: " + String(luminosity) + " Lux | ");
+    Serial.print("Umidade do Ar: " + String(airHumidity) + "% | ");
+    Serial.println("Temperatura do Ar: " + String(airTemp) + "°C");
+    Serial.println("------------------------------");
+
+    soilMoistureAvg += soilMoisture;
+    soilTempAvg += soilTemp;
+    airMoistureAvg += airHumidity;
+    airTempAvg += airTemp;
+    brightnessAvg += luminosity;
+
+    delay(2000);
+  }
+
+  // Cálculo das médias
+  soilMoistureAvg /= 10;
+  soilTempAvg /= 10;
+  airMoistureAvg /= 10;
+  airTempAvg /= 10;
+  brightnessAvg /= 10;
+
+  // Análise dos status
+  String soilMoistureStatus = analyzeStatus(soilMoistureAvg, "Umidade do Solo");
+  String soilTempStatus = analyzeStatus(soilTempAvg, "Temperatura do Solo");
+  String brightnessStatus = analyzeStatus(brightnessAvg, "Luminosidade");
+  String airMoistureStatus = analyzeStatus(airMoistureAvg, "Umidade do Ar");
+  String airTempStatus = analyzeStatus(airTempAvg, "Temperatura do Ar");
+
+  // Verificar e reconectar MQTT se necessário
   if (!client.connected()) {
     reconnectMQTT();
   }
 
-  // Aguarda a recepção dos dados de cultura e UUID via BLE antes de iniciar as medições
-  if (crops[0].isEmpty() || crops[1].isEmpty() || uuid.isEmpty()) {
-    Serial.println("Aguardando dados via BLE (cultura e UUID)...");
-    while (crops[0].isEmpty() || crops[1].isEmpty() || uuid.isEmpty()) {
-      client.loop();
-      delay(1000);
-    }
-    Serial.println("Dados recebidos via Bluetooth. Iniciando coletas...");
-  }
-  
-  while (true) {
-    float soilMoistureAvg = 0, soilTempAvg = 0, airMoistureAvg = 0, airTempAvg = 0, brightnessAvg = 0;
+  // Envio das médias para o MQTT
+  String cropsArray = "[\"" + crops[0] + "\", \"" + crops[1] + "\", \"" + crops[2] + "\"]";
+  sendToMQTT("agriculture/soil/moisture", "{\"moisture\": " + String(soilMoistureAvg) + ", \"status\": \"" + soilMoistureStatus + "\", \"crops\": " + cropsArray + "}");
+  sendToMQTT("agriculture/soil/temperature", "{\"temperature\": " + String(soilTempAvg) + ", \"status\": \"" + soilTempStatus + "\", \"crops\": " + cropsArray + "}");
+  sendToMQTT("agriculture/brightness", "{\"brightness\": " + String(brightnessAvg) + ", \"status\": \"" + brightnessStatus + "\", \"crops\": " + cropsArray + "}");
+  sendToMQTT("agriculture/air/moisture", "{\"moisture\": " + String(airMoistureAvg) + ", \"status\": \"" + airMoistureStatus + "\", \"crops\": " + cropsArray + "}");
+  sendToMQTT("agriculture/air/temperature", "{\"temperature\": " + String(airTempAvg) + ", \"status\": \"" + airTempStatus + "\", \"crops\": " + cropsArray + "}");
 
-    for (int i = 0; i < 10; i++) {
-      float soilMoisture = calibrateSoilMoisture(analogRead(SOIL_MOISTURE_PIN));
-      float airHumidity = dht.readHumidity();
-      float airTemp = dht.readTemperature();
-      float luminosity = map(analogRead(LUMINOSITY_PIN), 0, 4095, 0, 100000);
+  client.loop();
 
-      soilTempSensor.requestTemperatures();
-      float soilTemp = soilTempSensor.getTempCByIndex(0);
+  // Impressão das médias finais
+  Serial.println("Médias finais:");
+  Serial.print("Umidade do Solo: " + String(soilMoistureAvg) + "% | ");
+  Serial.print("Temperatura do Solo: " + String(soilTempAvg) + "°C | ");
+  Serial.print("Luminosidade: " + String(brightnessAvg) + " Lux | ");
+  Serial.print("Umidade do Ar: " + String(airMoistureAvg) + "% | ");
+  Serial.println("Temperatura do Ar: " + String(airTempAvg) + "°C");
+  Serial.println("------------------------------");
 
-      // Substituir por zero se não houver leitura válida
-      soilMoisture = isnan(soilMoisture) ? 0 : soilMoisture;
-      soilTemp = (soilTemp == DEVICE_DISCONNECTED_C || isnan(soilTemp)) ? 0 : soilTemp;
-      airHumidity = isnan(airHumidity) ? 0 : airHumidity;
-      airTemp = isnan(airTemp) ? 0 : airTemp;
-      luminosity = isnan(luminosity) ? 0 : luminosity;
+  Serial.println("Deseja realizar uma nova medição agora ou esperar 2 horas?");
+  Serial.println("Digite 'N' para nova medição ou 'E' para esperar 2 horas:");
 
-      Serial.print("Leitura ");
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.print("Umidade do Solo: " + String(soilMoisture) + "% | ");
-      Serial.print("Temperatura do Solo: " + String(soilTemp) + "°C | ");
-      Serial.print("Luminosidade: " + String(luminosity) + " Lux | ");
-      Serial.print("Umidade do Ar: " + String(airHumidity) + "% | ");
-      Serial.println("Temperatura do Ar: " + String(airTemp) + "°C");
-      Serial.print("Culturas: " + crops[0] + ", " + crops[1]);
-      Serial.println("------------------------------");
+  while (Serial.available() == 0) {} 
+  String resposta = Serial.readString();
+  resposta.trim();
 
-      soilMoistureAvg += soilMoisture;
-      soilTempAvg += soilTemp;
-      airMoistureAvg += airHumidity;
-      airTempAvg += airTemp;
-      brightnessAvg += luminosity;
-
-      delay(2000);
-    }
-
-    // Cálculo das médias
-    soilMoistureAvg /= 10;
-    soilTempAvg /= 10;
-    airMoistureAvg /= 10;
-    airTempAvg /= 10;
-    brightnessAvg /= 10;
-
-    // Envio das médias para o MQTT
-    sendToMQTT("agriculture/soil/moisture", "{\"moisture\": " + String(soilMoistureAvg) + ", \"status\": \"Normal\", \"crops\": [\"" + crops[0] + "\", \"" + crops[1] + "\"]}");
-    sendToMQTT("agriculture/soil/temperature", "{\"temperature\": " + String(soilTempAvg) + ", \"status\": \"Normal\", \"crops\": [\"" + crops[0] + "\", \"" + crops[1] + "\"]}");
-    sendToMQTT("agriculture/brightness", "{\"brightness\": " + String(brightnessAvg) + ", \"status\": \"Suficiente\", \"crops\": [\"" + crops[0] + "\", \"" + crops[1] + "\"]}");
-    sendToMQTT("agriculture/air/moisture", "{\"moisture\": " + String(airMoistureAvg) + ", \"status\": \"Alta\", \"crops\": [\"" + crops[0] + "\", \"" + crops[1] + "\"]}");
-    sendToMQTT("agriculture/air/temperature", "{\"temperature\": " + String(airTempAvg) + ", \"status\": \"Alta\", \"crops\": [\"" + crops[0] + "\", \"" + crops[1] + "\"]}");
-
-    client.loop();
-
-    Serial.println("Médias finais:");
-    Serial.print("Umidade do Solo: " + String(soilMoistureAvg) + "% | ");
-    Serial.print("Temperatura do Solo: " + String(soilTempAvg) + "°C | ");
-    Serial.print("Luminosidade: " + String(brightnessAvg) + " Lux | ");
-    Serial.print("Umidade do Ar: " + String(airMoistureAvg) + "% | ");
-    Serial.println("Temperatura do Ar: " + String(airTempAvg) + "°C");
-    Serial.print("Culturas: " + crops[0] + ", " + crops[1]);
-    Serial.println("------------------------------");
-
-    Serial.println("Deseja realizar uma nova medição agora ou esperar 2 horas?");
-    Serial.println("Digite 'N' para nova medição ou 'E' para esperar 2 horas:");
-
-    while (Serial.available() == 0) {}
-    String resposta = Serial.readString();
-    resposta.trim();
-
-    if (resposta == "E" || resposta == "e") {
-      Serial.println("Esperando por 2 horas...");
-      delay(7200000);
-    } else if (resposta == "N" || resposta == "n") {
-      Serial.println("Nova medição será feita agora.");
-    } else {
-      Serial.println("Comando não reconhecido. Nova medição será feita.");
-    }
+  if (resposta == "E" || resposta == "e") {
+    Serial.println("Esperando por 2 horas...");
+    delay(7200000);
+  } else if (resposta == "N" || resposta == "n") {
+    Serial.println("Nova medição será feita agora.");
+  } else {
+    Serial.println("Comando não reconhecido. Nova medição será feita.");
   }
 }
 
@@ -268,35 +220,44 @@ void reconnectMQTT() {
 }
 
 void sendToMQTT(String topic, String payload) {
-  client.publish(topic.c_str(), payload.c_str());
-}
+  Serial.println("Enviando mensagem MQTT:");
+  Serial.print("Tópico: ");
+  Serial.println(topic);
+  Serial.print("Payload: ");
+  Serial.println(payload);
 
-void setupBLE() {
-    BLEDevice::init("ESP32_WiFi_Credentials");
-    BLEServer *pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks());
-
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-    BLECharacteristic *pCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID,
-        BLECharacteristic::PROPERTY_READ |
-        BLECharacteristic::PROPERTY_WRITE |
-        BLECharacteristic::PROPERTY_NOTIFY |
-        BLECharacteristic::PROPERTY_INDICATE
-    );
-
-    pCharacteristic->setCallbacks(new MyCallbacks());
-    pService->start();
-    
-    pAdvertising = pServer->getAdvertising();
-    pAdvertising->setMinPreferred(0x06); // Aumentar a visibilidade
-    pAdvertising->start();
-
-    Serial.println("Bluetooth configurado.");
+  if (client.publish(topic.c_str(), payload.c_str())) {
+    Serial.println("Mensagem enviada com sucesso.");
+  } else {
+    Serial.println("Erro ao enviar mensagem MQTT.");
+    Serial.println(client.state());
+    reconnectMQTT(); // Tentativa de reconectar se falhar
+  }
 }
 
 float calibrateSoilMoisture(int rawValue) {
-  int dry = 700;
+  int dry = 300;
   int wet = 3200;
   return map(rawValue, dry, wet, 0, 100);
+}
+
+String analyzeStatus(float value, String type) {
+  if (type == "Umidade do Solo") {
+    if (value < 30) return "Baixa";
+    else if (value < 70) return "Normal";
+    else return "Alta";
+  } else if (type == "Temperatura do Solo" || type == "Temperatura do Ar") {
+    if (value < 15) return "Baixa";
+    else if (value < 35) return "Normal";
+    else return "Alta";
+  } else if (type == "Luminosidade") {
+    if (value < 10000) return "Baixa";
+    else if (value < 50000) return "Normal";
+    else return "Alta";
+  } else if (type == "Umidade do Ar") {
+    if (value < 30) return "Baixa";
+    else if (value < 60) return "Normal";
+    else return "Alta";
+  }
+  return "Desconhecido";
 }
