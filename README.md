@@ -115,3 +115,7 @@ Contribuições são bem-vindas! Siga as etapas no arquivo `CONTRIBUTING.md` par
 ----------
 
 Este projeto está licenciado sob a Licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+* * * * *
+
+### 🏆 Arquitetado e desenvolvido por Vinicius Prudencio - VMB - Challenge FIAP 2024
