@@ -9,9 +9,9 @@
 // Definindo os pinos dos sensores
 #define DHTPIN 18               // Pino do sensor DHT para umidade e temperatura do ar
 #define DHTTYPE DHT22           // Tipo de sensor DHT
-#define SOIL_MOISTURE_PIN 36    // Pino do sensor de umidade do solo
-#define LUMINOSITY_PIN 39       // Pino do sensor de luminosidade
-#define DS18B20_PIN 4           // Pino do sensor de temperatura DS18B20
+#define SOIL_MOISTURE_PIN 36    // VN 39 - Pino do sensor de umidade do solo
+#define LUMINOSITY_PIN 36       // VP 36 - Pino do sensor de luminosidade
+#define DS18B20_PIN 26          // Pino do sensor de temperatura DS18B20
 
 DHT dht(DHTPIN, DHTTYPE);
 OneWire oneWire(DS18B20_PIN);           
@@ -236,8 +236,8 @@ void sendToMQTT(String topic, String payload) {
 }
 
 float calibrateSoilMoisture(int rawValue) {
-  int dry = 300;
-  int wet = 3200;
+  int dry = 0;
+  int wet = 2000;
   return map(rawValue, dry, wet, 0, 100);
 }
 
